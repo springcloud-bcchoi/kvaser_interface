@@ -19,6 +19,8 @@ using namespace AS::CAN;
 int bit_rate = 500000;
 int hardware_id = 0;
 int circuit_id = 0;
+std::string rx_topic;
+std::string tx_topic;
 KvaserCan can_reader, can_writer;
 ros::Publisher can_tx_pub;
 
@@ -171,14 +173,36 @@ int main(int argc, char** argv)
     }
   }
 
+  if (priv.getParam("can_rx_topic", rx_topic))
+  {
+    ROS_INFO("Kvaser CAN Interface - rx_topic: %s", rx_topic);
+
+    if (rx_topic.size() <= 0)
+    {
+      ROS_ERROR("Kvaser CAN Interface - RX topic is invalid.");
+      exit = true;
+    }
+  }
+
+  if (priv.getParam("can_tx_topic", tx_topic))
+  {
+    ROS_INFO("Kvaser CAN Interface - tx_topic: %s", tx_topic);
+
+    if (rx_topic.size() <= 0)
+    {
+      ROS_ERROR("Kvaser CAN Interface - TX topic is invalid.");
+      exit = true;
+    }
+  }
+
   if (exit)
   {
     ros::shutdown();
     return 0;
   }
 
-  can_tx_pub = n.advertise<can_msgs::Frame>("can_tx", 500);
-  ros::Subscriber can_rx_sub = n.subscribe("can_rx", 500, can_rx_callback);
+  can_tx_pub = n.advertise<can_msgs::Frame>(tx_topic, 500);
+  ros::Subscriber can_rx_sub = n.subscribe(rx_topic, 500, can_rx_callback);
 
   ReturnStatuses ret;
 
