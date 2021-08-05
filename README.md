@@ -11,9 +11,12 @@ The following are required prerequisites:
 * The Kvaser CANLIB API (https://www.kvaser.com/downloads/)
     * Can be [downloaded directly](https://www.kvaser.com/kvaser-downloads) or installed through PPA:
 
-        `sudo apt-add-repository ppa:jwhitleyastuff/linuxcan-dkms`
+        `sudo apt-add-repository ppa:astuff/kvaser-linux`
 
-        `sudo apt update && sudo apt install -y linuxcan-dkms`
+        `sudo apt update && sudo apt install -y kvaser-canlib-dev`
+    * You can optionally install the Kvaser drivers from the PPA with the following command:
+
+        `sudo apt install -y kvaser-drivers-dkms`
     * For Linux kernel 4.13 or higher, version 5.21 or higher of CANLIB is required
 * `can_msgs`
 
@@ -42,3 +45,13 @@ This is the 0-based index of the channel number *on the specific hardware device
 *~can_bit_rate*
 
 This is the communication rate to be used on the CAN channel in bits per second (default: 500000).
+
+**TOOLS**
+
+*list_channels*
+
+A simple tool with no ROS dependencies which returns a list of all Kvaser devices and channels available on those devices.
+
+*canmonitor*
+
+A simple tool with no ROS depedencies to output the CAN messages received on a given channel index (-i - default: 0) and bitrate (-b - default: 500000) to the terminal.

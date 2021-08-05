@@ -1,137 +1,95 @@
 version: 2
 jobs:
-  indigo:
-    docker:
-      - image: autonomoustuff/docker-builds:indigo-ros-base
-    steps:
-      - checkout
-      - run:
-          name: Set Up Container
-          command: |
-            apt-add-repository -y ppa:jwhitleyastuff/linuxcan-dkms
-            apt-get update -qq && apt-get install -y linux-headers-generic linuxcan-dkms
-            source `find /opt/ros -name setup.bash | sort | head -1`
-            rosdep install --from-paths . --ignore-src -y
-            cd ..
-            catkin init
-            catkin config --extend /opt/ros/$ROS_DISTRO
-      - run:
-          name: Build
-          command: |
-            cd ..
-            catkin build
-      - run:
-          name: Run Tests
-          command: |
-            cd ..
-            catkin run_tests
-    working_directory: ~/src
-
   kinetic:
-    docker:
-      - image: autonomoustuff/docker-builds:kinetic-ros-base
+    machine:
+      image: ubuntu-1604:201903-01
     steps:
       - checkout
       - run:
-          name: Set Up Container
+          name: Install Linuxcan on Host
           command: |
-            apt-add-repository -y ppa:jwhitleyastuff/linuxcan-dkms
-            apt-get update -qq && apt-get install -y linux-headers-generic linuxcan-dkms
-            source `find /opt/ros -name setup.bash | sort | head -1`
-            rosdep install --from-paths . --ignore-src -y
-            cd ..
-            catkin init
-            catkin config --extend /opt/ros/$ROS_DISTRO
+            sudo apt-add-repository -y ppa:astuff/kvaser-linux
+            sudo apt-get clean && sudo apt-get update -qq && sudo apt-get install dpkg # Fix dpkg bug
+            sudo apt-get install -y linux-headers-`uname -r` kvaser-drivers-dkms
+            sudo depmod
+            cd /usr/src/kvaser-drivers-*
+            sudo sed -i 's/#define NR_VIRTUAL_DEV       1/#define NR_VIRTUAL_DEV       3/g' virtualcan/virtualcan.h
+            sudo make virtualcan
+            sudo install -m 644 virtualcan/kvvirtualcan.ko /lib/modules/`uname -r`/updates/dkms/
+            sudo virtualcan.sh start
       - run:
-          name: Build
+          name: Clone and Run AS Docker Image
           command: |
-            cd ..
-            catkin build
+            docker pull autonomoustuff/docker-builds:kinetic-ros-base
+            docker run -d --name test --device=/dev/kvvirtualcan0 --device=/dev/kvvirtualcan1 --device=/dev/kvvirtualcan2 --device=/dev/kvvirtualcan3 --device=/dev/kvvirtualcan4 --device=/dev/kvvirtualcan5 -v `pwd`:/ros_ws/src -w /ros_ws autonomoustuff/docker-builds:kinetic-ros-base sh -c "sleep infinity"
       - run:
-          name: Run Tests
+          name: Install Linuxcan in Docker
           command: |
-            cd ..
-            catkin run_tests
-    working_directory: ~/src
-
-  lunar:
-    docker:
-      - image: autonomoustuff/docker-builds:lunar-ros-base
-    steps:
-      - checkout
+            docker exec test /bin/bash -c "apt-add-repository -y ppa:astuff/kvaser-linux && apt update -qq"
+            docker exec test /bin/bash -c "apt install -y kvaser-canlib-dev"
       - run:
-          name: Set Up Container
+          name: Set Up ROS in Docker
           command: |
-            apt-add-repository -y ppa:jwhitleyastuff/linuxcan-dkms
-            apt-get update -qq && apt-get install -y linux-headers-generic linuxcan-dkms
-            source `find /opt/ros -name setup.bash | sort | head -1`
-            rosdep install --from-paths . --ignore-src -y
-            cd ..
-            catkin init
-            catkin config --extend /opt/ros/$ROS_DISTRO
+            docker exec test /bin/bash -c "source \`find /opt/ros -name setup.bash | sort | head -1\` && rosdep install --from-paths src --ignore-src -y"
+            docker exec test /bin/bash -c "source \`find /opt/ros -name setup.bash | sort | head -1\` && catkin init && catkin config --extend /opt/ros/\$ROS_DISTRO"
       - run:
-          name: Build
+          name: Build in Docker
           command: |
-            cd ..
-            catkin build
+            docker exec test /bin/bash -c "source \`find /opt/ros -name setup.bash | sort | head -1\` && catkin build"
       - run:
-          name: Run Tests
+          name: Run Tests in Docker
           command: |
-            cd ..
-            catkin run_tests
+            docker exec test /bin/bash -c "source \`find /opt/ros -name setup.bash | sort | head -1\` && catkin run_tests -j1 && catkin_test_results"
+      - run:
+          name: Shut Down Container
+          command: |
+            docker kill $(docker ps -l -q)
     working_directory: ~/src
 
   melodic:
-    docker:
-      - image: autonomoustuff/docker-builds:melodic-ros-base
+    machine:
+      image: ubuntu-1604:201903-01
     steps:
       - checkout
       - run:
-          name: Set Up Container
+          name: Install Linuxcan on Host
           command: |
-            apt-add-repository -y ppa:jwhitleyastuff/linuxcan-dkms
-            apt-get update -qq && apt-get install -y linux-headers-generic linuxcan-dkms
-            source `find /opt/ros -name setup.bash | sort | head -1`
-            rosdep install --from-paths . --ignore-src -y
-            cd ..
-            catkin init
-            catkin config --extend /opt/ros/$ROS_DISTRO
+            sudo apt-add-repository -y ppa:astuff/kvaser-linux
+            sudo apt-get clean && sudo apt-get update -qq && sudo apt-get install dpkg # Fix dpkg bug
+            sudo apt-get install -y linux-headers-`uname -r` kvaser-drivers-dkms
+            sudo depmod
+            cd /usr/src/kvaser-drivers-*
+            sudo sed -i 's/#define NR_VIRTUAL_DEV       1/#define NR_VIRTUAL_DEV       3/g' virtualcan/virtualcan.h
+            sudo make virtualcan
+            sudo install -m 644 virtualcan/kvvirtualcan.ko /lib/modules/`uname -r`/updates/dkms/
+            sudo virtualcan.sh start
       - run:
-          name: Build
+          name: Clone and Run AS Docker Image
           command: |
-            cd ..
-            catkin build
+            docker pull autonomoustuff/docker-builds:melodic-ros-base
+            docker run -d --name test --device=/dev/kvvirtualcan0 --device=/dev/kvvirtualcan1 --device=/dev/kvvirtualcan2 --device=/dev/kvvirtualcan3 --device=/dev/kvvirtualcan4 --device=/dev/kvvirtualcan5 -v `pwd`:/ros_ws/src -w /ros_ws autonomoustuff/docker-builds:kinetic-ros-base sh -c "sleep infinity"
       - run:
-          name: Run Tests
+          name: Install Linuxcan in Docker
           command: |
-            cd ..
-            catkin run_tests
-    working_directory: ~/src
-
-  indigo_release:
-    docker:
-      - image: autonomoustuff/docker-builds:indigo-ros-base
-    steps:
-      - checkout
+            docker exec test /bin/bash -c "apt-add-repository -y ppa:astuff/kvaser-linux && apt update -qq"
+            docker exec test /bin/bash -c "apt install -y kvaser-canlib-dev"
       - run:
-          name: Set Up Container
+          name: Set Up ROS in Docker
           command: |
-            apt-add-repository -y ppa:jwhitleyastuff/linuxcan-dkms
-            apt-get update -qq && apt-get install -y linux-headers-generic linuxcan-dkms dh-make python-bloom ruby
-            gem install --no-rdoc --no-ri deb-s3
-            source `find /opt/ros -name setup.bash | sort | head -1`
-            rosdep install --from-paths . --ignore-src -y
+            docker exec test /bin/bash -c "source \`find /opt/ros -name setup.bash | sort | head -1\` && rosdep install --from-paths src --ignore-src -y"
+            docker exec test /bin/bash -c "source \`find /opt/ros -name setup.bash | sort | head -1\` && catkin init && catkin config --extend /opt/ros/\$ROS_DISTRO"
       - run:
-          name: Build
+          name: Build in Docker
           command: |
-            bloom-generate rosdebian --os-name ubuntu --os-version trusty --ros-distro indigo
-            sed -i '/dh_shlibdeps -l.*/ s/$/ --dpkg-shlibdeps-params=--ignore-missing-info/' debian/rules
-            fakeroot debian/rules binary
+            docker exec test /bin/bash -c "source \`find /opt/ros -name setup.bash | sort | head -1\` && catkin build"
       - run:
-          name: Upload
+          name: Run Tests in Docker
           command: |
-            cd ..
-            deb-s3 upload -b autonomoustuff-repo -c trusty --preserve-versions $(ls *.deb) --access-key-id=$S3_ACCESS_KEY_ID --secret-access-key=$S3_SECRET_ACCESS_KEY
+            docker exec test /bin/bash -c "source \`find /opt/ros -name setup.bash | sort | head -1\` && catkin run_tests -j1 && catkin_test_results"
+      - run:
+          name: Shut Down Container
+          command: |
+            docker kill $(docker ps -l -q)
     working_directory: ~/src
 
   kinetic_release:
@@ -142,8 +100,8 @@ jobs:
       - run:
           name: Set Up Container
           command: |
-            apt-add-repository -y ppa:jwhitleyastuff/linuxcan-dkms
-            apt-get update -qq && apt-get install -y linux-headers-generic linuxcan-dkms dh-make python-bloom ruby
+            apt-add-repository -y ppa:astuff/kvaser-linux
+            apt-get update -qq && apt-get install -y kvaser-canlib-dev dh-make python-bloom ruby
             gem install --no-rdoc --no-ri deb-s3
             source `find /opt/ros -name setup.bash | sort | head -1`
             rosdep install --from-paths . --ignore-src -y
@@ -151,32 +109,6 @@ jobs:
           name: Build
           command: |
             bloom-generate rosdebian --os-name ubuntu --os-version xenial --ros-distro kinetic
-            sed -i '/dh_shlibdeps -l.*/ s/$/ --dpkg-shlibdeps-params=--ignore-missing-info/' debian/rules
-            fakeroot debian/rules binary
-      - run:
-          name: Upload
-          command: |
-            cd ..
-            deb-s3 upload -b autonomoustuff-repo -c xenial --preserve-versions $(ls *.deb) --access-key-id=$S3_ACCESS_KEY_ID --secret-access-key=$S3_SECRET_ACCESS_KEY
-    working_directory: ~/src
-
-  lunar_release:
-    docker:
-      - image: autonomoustuff/docker-builds:lunar-ros-base
-    steps:
-      - checkout
-      - run:
-          name: Set Up Container
-          command: |
-            apt-add-repository -y ppa:jwhitleyastuff/linuxcan-dkms
-            apt-get update -qq && apt-get install -y linux-headers-generic linuxcan-dkms dh-make python-bloom ruby
-            gem install --no-rdoc --no-ri deb-s3
-            source `find /opt/ros -name setup.bash | sort | head -1`
-            rosdep install --from-paths . --ignore-src -y
-      - run:
-          name: Build
-          command: |
-            bloom-generate rosdebian --os-name ubuntu --os-version xenial --ros-distro lunar
             sed -i '/dh_shlibdeps -l.*/ s/$/ --dpkg-shlibdeps-params=--ignore-missing-info/' debian/rules
             fakeroot debian/rules binary
       - run:
@@ -194,8 +126,8 @@ jobs:
       - run:
           name: Set Up Container
           command: |
-            apt-add-repository -y ppa:jwhitleyastuff/linuxcan-dkms
-            apt-get update -qq && apt-get install -y linux-headers-generic linuxcan-dkms dh-make python-bloom ruby
+            apt-add-repository -y ppa:astuff/kvaser-linux
+            apt-get update -qq && apt-get install -y kvaser-canlib-dev dh-make python-bloom ruby
             gem install --no-rdoc --no-ri deb-s3
             source `find /opt/ros -name setup.bash | sort | head -1`
             rosdep install --from-paths . --ignore-src -y
@@ -216,41 +148,21 @@ workflows:
   version: 2
   ros_build:
     jobs:
-      - indigo:
-          filters:
-            branches:
-              ignore: release
-      - kinetic:
-          filters:
-            branches:
-              ignore: release
-      - lunar:
-          filters:
-            branches:
-              ignore: release
-      - melodic:
-          filters:
-            branches:
-              ignore: release
+      - kinetic
+      - melodic
   ros_release:
     jobs:
-      - indigo_release:
-          context: ubuntu-pkg-build
-          filters:
-            branches:
-              only: release
       - kinetic_release:
           context: ubuntu-pkg-build
           filters:
             branches:
-              only: release
-      - lunar_release:
-          context: ubuntu-pkg-build
-          filters:
-            branches:
-              only: release
+              ignore: /.*/
+            tags:
+              only: /^[0-9]*.[0-9]*.[0-9]*$/
       - melodic_release:
           context: ubuntu-pkg-build
           filters:
             branches:
-              only: release
+              ignore: /.*/
+            tags:
+              only: /^[0-9]*.[0-9]*.[0-9]*$/
